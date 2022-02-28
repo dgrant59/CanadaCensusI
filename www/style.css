@@ -1,0 +1,21 @@
+.custom-popup .leaflet-popup-content-wrapper {
+  background: #DB0925;
+  color:#fff;
+  font-size:16px;
+  line-height:24px;
+  }
+
+.leaflet-popup-content { 
+  width: 450px;
+}
+
+#provpan {
+  background-color: #ffffff;
+  opacity: 1;
+  }
+
+
+.datapopup{
+border-collapse: separate;
+    border-spacing: 0 0.5em;
+}

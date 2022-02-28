@@ -1,13 +1,15 @@
 library(tidyverse)
 library(readxl)
-library(rgdal)
-library(ggspatial)
 library(magrittr)
-library(fuzzyjoin)
 library(tmap)
 library(RColorBrewer)
 library(svglite)
 library(sf)
+library(shiny)
+library(shinyjs)
+library(tmap)
+library(leaflet)
+library(leafpop)
 #setwd("PATHHERE")
 
 
@@ -25,6 +27,7 @@ popdata %<>% mutate(ALT_GEO_CODE=factor(ALT_GEO_CODE))
 #                   stringsAsFactors = T)
 canada <- read_sf(dsn = "./ShapeFiles/Alt3/TestReduced.shp", 
                   stringsAsFactors = T)
+canada <- st_transform(canada, 4326)
 #Join map data to case data for easy plotting
 canada <- left_join(canada,popdata, by=c("DGUID"="DGUID"),keep=F) 
 
@@ -47,35 +50,28 @@ pnames <- c("Newfoundland and Labrador\n(Terre-Neuve-et-Labrador)",
             "Yukon",
             "Northwest Territories\n(Territoires du Nord-Ouest)",
             "Nunavut")
-library(shiny)
-library(shinyjs)
-library(tmap)
 pnames_simp <- data.frame(place = paste0(sub("\\n.*","",pnames)),
                           ID =as.numeric(levels(popdata$PRUID)))
 popdata %<>% mutate(PRName = factor(PRUID, labels = pnames_simp[,1]))
 pnames_simp <- pnames_simp[order(paste0(sub("\\n.*","",pnames))),]
 names(canada)[11] <- "Name"
 names(popdata)[5] <- "Name"
+
+colorfun <- colorBin("RdYlGn",bins=c(-Inf,0,2.6,5.2,7.8,10.4,Inf))
+
 ui <- fluidPage(
   tags$h1("Title"),
-  tags$head(tags$style(
-    HTML('
-         #provpan {
-            background-color: #ffffff;
-            opacity: 0.2;
-        }'))),
+  tags$head(includeCSS("./www/style.css")),
   shinyjs::useShinyjs(),
-    tmapOutput(outputId = "canadamap",width = "100%",height=600),
-    absolutePanel(id = "provpan",class = "panel panel-default",
-                  draggable = TRUE, top = 240, left = 20, right = "auto", bottom = "auto",
-                  width = 330, height = "auto",
-                  checkboxGroupInput(inputId = "province", 
-                       label = "Select Provinces/Territories (More selected will take more time)",
-                       choiceNames = pnames_simp[,1], 
-                       choiceValues = pnames_simp[,2], 
-                       inline = F),
-    actionButton("submit", "Submit")),
-  # fluidRow(column(6,tableOutput("top")),column(6, tableOutput("bottom")))
+  sidebarLayout(sidebarPanel(id = "provpan",class = "panel panel-default",
+                             checkboxGroupInput(inputId = "province", 
+                                                label = "Select Provinces/Territories (More selected will take more time)",
+                                                choiceNames = pnames_simp[,1], 
+                                                choiceValues = pnames_simp[,2], 
+                                                inline = F),
+                             actionButton("submit", "Submit")),
+                mainPanel(leafletOutput(outputId = "canadamap",width = "100%",height=600))),
+  fluidRow(column(6,tableOutput("top")),column(6, tableOutput("bottom")))
 )
 server <- function(input,output){
   
@@ -85,10 +81,12 @@ server <- function(input,output){
   mapdata <- eventReactive(input$submit, {
     canada[canada$PRUID%in%input$province,]
   })
-
   
+  popdataR <- eventReactive(input$submit, {
+    popdata[popdata$PRUID%in%input$province,]
+  })
   tabledatatop <- eventReactive(input$submit, {
-    popdata[popdata$PRUID%in%input$province,] %>% 
+    popdataR() %>% 
       filter(`Population, 2016`>=1000)%>%
       arrange(`Population percentage change, 2016 to 2021`) %>% 
       head(5) %>% 
@@ -100,7 +98,7 @@ server <- function(input,output){
              `Quality Flags`)
   })
   tabledatabottom<- eventReactive(input$submit, {
-    popdata[popdata$PRUID%in%input$province,] %>% 
+    popdataR() %>% 
       filter(`Population, 2016`>=1000)%>%
       arrange(desc(`Population percentage change, 2016 to 2021`)) %>% 
       head(5) %>% 
@@ -112,22 +110,21 @@ server <- function(input,output){
              `Quality Flags`)
   })
   
-  output$canadamap <- renderTmap({
-      tm_shape(st_make_valid(mapdata()))+
-        tm_fill(col="Population percentage change, 2016 to 2021",
-                alpha=0.5,
-                midpoint = 5.2,
-                breaks=c(-Inf,0,2.6,5.2,7.8,10.4,Inf),
-                popup.vars=c("Name",
-                             "Population, 2016",
-                             "Population, 2021",
-                             "Population percentage change, 2016 to 2021",
-                             "Quality Flags"))+
-        tm_borders()+
-        tmap_options(check.and.fix = T,basemaps = "OpenStreetMap")+
-        tm_view(leaflet.options = list("height"="1000"))
-    
+  output$canadamap <- renderLeaflet({leaflet(mapdata()) %>% addPolygons(
+    fillColor = ~colorfun(`Population percentage change, 2016 to 2021`),
+    fillOpacity = 0.6,
+    color="black",
+    weight=1,
+    opacity=1,
+    popup=customtable(popdataR())
+  ) %>% addProviderTiles(providers$OpenStreetMap) %>% addLegend("topright", 
+                                                                title = "Population Change (%), 2016 to 2021",
+                                                                colors=c(brewer.pal(6,"RdYlGn"),"#808080"), 
+                                                                opacity=0.6,
+                                                                values=~`Population percentage change, 2016 to 2021`,
+                                                                labels = c("Less than 0","0 to 2.6","2.6 to 5.2","5.2 to 7.8","7.8 to 10.4","More than 10.4","No population in 2016"))
   })
+
   output$top <- renderTable({tabledatatop()},striped = T)
   output$bottom <- renderTable({tabledatabottom()},striped=T)
   
@@ -136,9 +133,77 @@ server <- function(input,output){
 shinyApp(ui = ui, server = server)
 
 
-
-
-
+#derived from leafpop 
+customtable <- function(data){
+  paste0(
+    "<div class='scrollableContainer'>
+      <table class='datapopup'>
+      <tr>
+      <td></td>
+      <th style='font-weight:bold'>Name&emsp;</th>
+      <td style='text-align:right'>",data$Name,"&emsp;</td>
+      </tr>
+      <tr>
+         <td></td>
+         <th style='font-weight:bold'>Population, 2016&emsp;</th>
+         <td style='text-align:right'>",format(data$`Population, 2016`,big.mark=","),"&emsp;</td>
+      </tr>
+      <tr>
+         <td></td>
+         <th style='font-weight:bold'>Population, 2021&emsp;</th>
+         <td style='text-align:right'>",format(data$`Population, 2021`,big.mark=","),"&emsp;</td>
+      </tr>
+      <tr>
+         <td></td>
+         <th style='font-weight:bold'>Population Change (%), 2016 to 2021&emsp;</th>
+         <td style='text-align:right'>", data$`Population percentage change, 2016 to 2021`,"&emsp;</td>
+      </tr>
+      <tr>
+         <td></td>
+         <th style='font-weight:bold'>Quality Flags&emsp;</th>
+         <td style='text-align:right'>",data$`Quality Flags`,"&emsp;</td>
+      </tr>
+   </table>
+</div>"
+  )
+}  
+  
+# "
+# <div class='scrollableContainer'>
+#    <table class= id='popup'>
+#       <tr>
+#          <td></td>
+#          <th>Name&emsp;</th>
+#          <td>St. Shott's, Town (T)&emsp;</td>
+#       </tr>
+#       <tr>
+#          <td></td>
+#          <th>Population, 2016&emsp;</th>
+#          <td>    66&emsp;</td>
+#       </tr>
+#       <tr>
+#          <td></td>
+#          <th>Population, 2021&emsp;</th>
+#          <td>    55&emsp;</td>
+#       </tr>
+#       <tr>
+#          <td></td>
+#          <th>Population percentage change, 2016 to 2021&emsp;</th>
+#          <td> -16.7&emsp;</td>
+#       </tr>
+#       <tr>
+#          <td></td>
+#          <th>Quality Flags&emsp;</th>
+#          <td>0, 0, 0&emsp;</td>
+#       </tr>
+#       <tr>
+#          <td></td>
+#          <th>geometry&emsp;</th>
+#          <td>sfc_MULTIPOLYGON&emsp;</td>
+#       </tr>
+#    </table>
+# </div>
+# "
 
 
 
