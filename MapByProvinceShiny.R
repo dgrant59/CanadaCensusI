@@ -10,6 +10,7 @@ library(shinyjs)
 library(tmap)
 library(leaflet)
 library(leafpop)
+library(bslib)
 #setwd("PATHHERE")
 
 
@@ -23,9 +24,7 @@ popdata <- popdata[,-c(6,7,9,11)] %>% group_by(ALT_GEO_CODE) %>% pivot_wider(nam
 popdata <- left_join(popdata,data_qual,by=c("ALT_GEO_CODE"="ALT_GEO_CODE"),keep=F)
 popdata %<>% mutate(ALT_GEO_CODE=factor(ALT_GEO_CODE))
 ###### MAP DATA
-# canada <- readOGR(dsn = "./ShapeFiles/Alt3/lcsd000b21a_e.shp", 
-#                   stringsAsFactors = T)
-canada <- read_sf(dsn = "./ShapeFiles/Alt3/TestReduced.shp", 
+canada <- read_sf(dsn = "TestReduced.shp", 
                   stringsAsFactors = T)
 canada <- st_transform(canada, 4326)
 #Join map data to case data for easy plotting
@@ -58,81 +57,6 @@ names(canada)[11] <- "Name"
 names(popdata)[5] <- "Name"
 
 colorfun <- colorBin("RdYlGn",bins=c(-Inf,0,2.6,5.2,7.8,10.4,Inf))
-
-ui <- fluidPage(
-  tags$h1("Title"),
-  tags$head(includeCSS("./www/style.css")),
-  shinyjs::useShinyjs(),
-  sidebarLayout(sidebarPanel(id = "provpan",class = "panel panel-default",
-                             checkboxGroupInput(inputId = "province", 
-                                                label = "Select Provinces/Territories (More selected will take more time)",
-                                                choiceNames = pnames_simp[,1], 
-                                                choiceValues = pnames_simp[,2], 
-                                                inline = F),
-                             actionButton("submit", "Submit")),
-                mainPanel(leafletOutput(outputId = "canadamap",width = "100%",height=600))),
-  fluidRow(column(6,tableOutput("top")),column(6, tableOutput("bottom")))
-)
-server <- function(input,output){
-  
-
-  observe({toggleState("submit",sum(input$province>0))})
-  
-  mapdata <- eventReactive(input$submit, {
-    canada[canada$PRUID%in%input$province,]
-  })
-  
-  popdataR <- eventReactive(input$submit, {
-    popdata[popdata$PRUID%in%input$province,]
-  })
-  tabledatatop <- eventReactive(input$submit, {
-    popdataR() %>% 
-      filter(`Population, 2016`>=1000)%>%
-      arrange(`Population percentage change, 2016 to 2021`) %>% 
-      head(5) %>% 
-      select(Name,
-             PRName,
-             `Population, 2016`, 
-             `Population, 2021`, 
-             `Population percentage change, 2016 to 2021`, 
-             `Quality Flags`)
-  })
-  tabledatabottom<- eventReactive(input$submit, {
-    popdataR() %>% 
-      filter(`Population, 2016`>=1000)%>%
-      arrange(desc(`Population percentage change, 2016 to 2021`)) %>% 
-      head(5) %>% 
-      select(Name, 
-             PRName,
-             `Population, 2016`, 
-             `Population, 2021`, 
-             `Population percentage change, 2016 to 2021`, 
-             `Quality Flags`)
-  })
-  
-  output$canadamap <- renderLeaflet({leaflet(mapdata()) %>% addPolygons(
-    fillColor = ~colorfun(`Population percentage change, 2016 to 2021`),
-    fillOpacity = 0.6,
-    color="black",
-    weight=1,
-    opacity=1,
-    popup=customtable(popdataR())
-  ) %>% addProviderTiles(providers$OpenStreetMap) %>% addLegend("topright", 
-                                                                title = "Population Change (%), 2016 to 2021",
-                                                                colors=c(brewer.pal(6,"RdYlGn"),"#808080"), 
-                                                                opacity=0.6,
-                                                                values=~`Population percentage change, 2016 to 2021`,
-                                                                labels = c("Less than 0","0 to 2.6","2.6 to 5.2","5.2 to 7.8","7.8 to 10.4","More than 10.4","No population in 2016"))
-  })
-
-  output$top <- renderTable({tabledatatop()},striped = T)
-  output$bottom <- renderTable({tabledatabottom()},striped=T)
-  
-}
-
-shinyApp(ui = ui, server = server)
-
-
 #derived from leafpop 
 customtable <- function(data){
   paste0(
@@ -167,6 +91,136 @@ customtable <- function(data){
 </div>"
   )
 }  
+
+dummytable <- popdata %>%
+  head(5) %>% 
+  select(Name,
+         PRName,
+         `Population, 2016`, 
+         `Population, 2021`, 
+         `Population percentage change, 2016 to 2021`, 
+         `Quality Flags`)
+names(dummytable)[c(2,5)] <- c("Province / Territory","Population Change (%), 2016 to 2021")
+for(i in 1:6){
+  dummytable[,i]=rep("",5)
+}
+
+
+
+ui <- fluidPage(
+  theme = bs_theme(
+    bg = "#101010", 
+    fg = "#FDF7F7", 
+    primary = "#ED79F9", 
+    base_font = "Arial"
+  ),
+  tags$head(includeCSS("./www/style.css")),
+  shinyjs::useShinyjs(),
+  fluidRow(column(4,
+                  tags$h1(style="text-align: center;",HTML("Population Changes in Canada<br/>2016 to 2021")),
+                  tags$div(style="margin:auto;width='100%';text-align: center;",tags$small("Daniel Grant (see github for more info)")),
+                  tags$h4(style="text-align: center;","Select Provinces/Territories"),
+                  tags$h5(style="text-align: center;","(More selected will take more time)"),
+                  br(),
+                  checkboxGroupInput(inputId = "province", 
+                                     choiceNames = pnames_simp[,1], 
+                                     choiceValues = pnames_simp[,2], 
+                                     label=NULL,
+                                     inline = F,
+                                     width="70%"),
+                  br(),
+                  actionButton("s_all", "Select All",width="49%"),
+                  actionButton("d_all", "Deselect All",width="49%"),
+                  br(),
+                  br(),
+                  actionButton("submit", "Submit",width="99%")),
+           column(8,leafletOutput(outputId = "canadamap",width = "100%",height=600))),
+  fluidRow(column(1),column(5,tags$h3("Top 5 Growing Regions"),tableOutput("top")),column(5, tags$h3("Bottom 5 Growing Regions"),tableOutput("bottom")),column(1))
+)
+server <- function(input,output,session){
+  
+
+  observe({toggleState("submit",sum(input$province>0))})
+  
+  observe({
+    if(is.null(input$s_all)||input$s_all==0)
+      return()
+    else{updateCheckboxGroupInput(session,"province",selected=pnames_simp[,2])}
+  })
+  observe({
+    if(is.null(input$d_all)||input$d_all==0)
+      return()
+    else{updateCheckboxGroupInput(session,"province",selected=NULL,choiceNames = pnames_simp[,1], 
+                                  choiceValues = pnames_simp[,2])}
+  })
+  mapdata <- eventReactive(input$submit, {
+    canada[canada$PRUID%in%input$province,]
+  })
+  
+  popdataR <- eventReactive(input$submit, {
+    popdata[popdata$PRUID%in%input$province,]
+  })
+  tabledatabottom <- eventReactive(input$submit, {
+    x <- popdataR() %>% 
+      filter(`Population, 2016`>=1000)%>%
+      arrange(`Population percentage change, 2016 to 2021`) %>% 
+      head(5) %>% 
+      select(Name,
+             PRName,
+             `Population, 2016`, 
+             `Population, 2021`, 
+             `Population percentage change, 2016 to 2021`) %>%
+      mutate(`Population, 2016` = format(`Population, 2016`,big.mark=",")) %>%
+      mutate(`Population, 2021` = format(`Population, 2021`,big.mark=","))
+    names(x)[c(2,5)] <- c("Province / Territory","Population Change (%), 2016 to 2021")
+    x
+  })
+  tabledatatop<- eventReactive(input$submit, {
+    x <- popdataR() %>% 
+      filter(`Population, 2016`>=1000)%>%
+      arrange(desc(`Population percentage change, 2016 to 2021`)) %>% 
+      head(5) %>% 
+      select(Name, 
+             PRName,
+             `Population, 2016`, 
+             `Population, 2021`, 
+             `Population percentage change, 2016 to 2021`) %>%
+      mutate(`Population, 2016` = format(`Population, 2016`,big.mark=",")) %>%
+      mutate(`Population, 2021` = format(`Population, 2021`,big.mark=","))
+    names(x)[c(2,5)] <- c("Province / Territory","Population Change (%), 2016 to 2021")
+    x
+  })
+  
+  output$canadamap <- renderLeaflet({leaflet(mapdata()) %>% addPolygons(
+    fillColor = ~colorfun(`Population percentage change, 2016 to 2021`),
+    fillOpacity = 0.6,
+    color="black",
+    weight=1,
+    opacity=1,
+    popup=customtable(popdataR())
+  ) %>% addProviderTiles(providers$OpenStreetMap) %>% addLegend("topright", 
+                                                                title = "Population Change (%), 2016 to 2021",
+                                                                colors=c(brewer.pal(6,"RdYlGn"),"#808080"), 
+                                                                opacity=0.6,
+                                                                values=~`Population percentage change, 2016 to 2021`,
+                                                                labels = c("Less than 0","0 to 2.6","2.6 to 5.2","5.2 to 7.8","7.8 to 10.4","More than 10.4","No population in 2016"))
+  })
+
+  output$top <- renderTable({if(is.null(input$submit)||input$submit==0){
+    dummytable
+  }
+    else{tabledatatop()}},striped = T)
+  output$bottom <- renderTable({if(is.null(input$submit)||input$submit==0){
+    dummytable
+  }
+    else{tabledatabottom()}},striped = T)
+  
+}
+
+shinyApp(ui = ui, server = server)
+
+
+
   
 # "
 # <div class='scrollableContainer'>
