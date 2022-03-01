@@ -11,7 +11,6 @@ library(tmap)
 library(leaflet)
 library(leafpop)
 library(bslib)
-#setwd("PATHHERE")
 
 
 popdata <- read.csv("98-401-X2021006_English_CSV_data.csv")
@@ -114,7 +113,7 @@ ui <- fluidPage(
     primary = "#ED79F9", 
     base_font = "Arial"
   ),
-  tags$head(includeCSS("./www/style.css")),
+  tags$head(tags$link(rel = "stylesheet", type = "text/css", href = "style.css")),
   shinyjs::useShinyjs(),
   fluidRow(column(4,
                   tags$h1(style="text-align: center;",HTML("Population Changes in Canada<br/>2016 to 2021")),
@@ -218,63 +217,3 @@ server <- function(input,output,session){
 }
 
 shinyApp(ui = ui, server = server)
-
-
-
-  
-# "
-# <div class='scrollableContainer'>
-#    <table class= id='popup'>
-#       <tr>
-#          <td></td>
-#          <th>Name&emsp;</th>
-#          <td>St. Shott's, Town (T)&emsp;</td>
-#       </tr>
-#       <tr>
-#          <td></td>
-#          <th>Population, 2016&emsp;</th>
-#          <td>    66&emsp;</td>
-#       </tr>
-#       <tr>
-#          <td></td>
-#          <th>Population, 2021&emsp;</th>
-#          <td>    55&emsp;</td>
-#       </tr>
-#       <tr>
-#          <td></td>
-#          <th>Population percentage change, 2016 to 2021&emsp;</th>
-#          <td> -16.7&emsp;</td>
-#       </tr>
-#       <tr>
-#          <td></td>
-#          <th>Quality Flags&emsp;</th>
-#          <td>0, 0, 0&emsp;</td>
-#       </tr>
-#       <tr>
-#          <td></td>
-#          <th>geometry&emsp;</th>
-#          <td>sfc_MULTIPOLYGON&emsp;</td>
-#       </tr>
-#    </table>
-# </div>
-# "
-
-
-
-
-
-# ui <- fluidPage(
-#   checkboxGroupInput(inputId = "province", 
-#                      label = "Select Provinces/Territories",
-#                      choices = pnames_simp[,1], 
-#                      selected = pnames_simp[9,1], 
-#                      inline = F),
-#   textOutput("test")
-# )
-# 
-# server <- function(input,output){
-#   output$test <- renderText(pnames_simp[pnames_simp[,1]%in%input$province,2])
-#   
-# }
-# 
-# shinyApp(ui = ui, server = server)
