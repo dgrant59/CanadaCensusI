@@ -12,7 +12,6 @@ library(leaflet)
 library(leafpop)
 library(bslib)
 
-
 popdata <- read.csv("98-401-X2021006_English_CSV_data.csv")
 popdata %<>% filter(GEO_LEVEL=="Census subdivision") %>% filter(CHARACTERISTIC_ID%in%c(1:3))
 
@@ -22,6 +21,7 @@ popdata <- popdata[,-c(6,7,9,11)] %>% group_by(ALT_GEO_CODE) %>% pivot_wider(nam
 
 popdata <- left_join(popdata,data_qual,by=c("ALT_GEO_CODE"="ALT_GEO_CODE"),keep=F)
 popdata %<>% mutate(ALT_GEO_CODE=factor(ALT_GEO_CODE))
+popdata$GEO_NAME <- enc2utf8(popdata$GEO_NAME)
 ###### MAP DATA
 canada <- read_sf(dsn = "TestReduced.shp", 
                   stringsAsFactors = T)
@@ -29,7 +29,7 @@ canada <- st_transform(canada, 4326)
 #Join map data to case data for easy plotting
 canada <- left_join(canada,popdata, by=c("DGUID"="DGUID"),keep=F) 
 
-PRUID <- factor(gsub("(^\\d{2}).*", "\\1", as.integer(as.character(popdata$ALT_GEO_CODE))))
+PRUID <- factor(gsub("(^\\d{2}).*", "\\1", as.integer(as.character(popdata$ALT_GEO_CODE)),useBytes = T))
 popdata$PRUID <- PRUID
 popdata %<>% mutate(`Population, 2016`= as.integer(`Population, 2016`))
 popdata %<>% mutate(`Population, 2021`= as.integer(`Population, 2021`))
@@ -133,7 +133,7 @@ ui <- fluidPage(
                   br(),
                   br(),
                   actionButton("submit", "Submit",width="99%")),
-           column(8,leafletOutput(outputId = "canadamap",width = "100%",height=600))),
+           column(8,leafletOutput(outputId = "canadamap",width = "100%",height=675))),
   fluidRow(column(1),column(5,tags$h3("Top 5 Growing Regions"),tableOutput("top")),column(5, tags$h3("Bottom 5 Growing Regions"),tableOutput("bottom")),column(1))
 )
 server <- function(input,output,session){
