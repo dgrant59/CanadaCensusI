@@ -23,7 +23,7 @@ popdata <- left_join(popdata,data_qual,by=c("ALT_GEO_CODE"="ALT_GEO_CODE"),keep=
 popdata %<>% mutate(ALT_GEO_CODE=factor(ALT_GEO_CODE))
 popdata$GEO_NAME <- enc2utf8(popdata$GEO_NAME)
 ###### MAP DATA
-canada <- read_sf(dsn = "TestReduced.shp", 
+canada <- read_sf(dsn = "./Shapefiles/TestReduced.shp", 
                   stringsAsFactors = T)
 canada <- st_transform(canada, 4326)
 #Join map data to case data for easy plotting
@@ -117,7 +117,7 @@ ui <- fluidPage(
   shinyjs::useShinyjs(),
   fluidRow(column(4,
                   tags$h1(style="text-align: center;",HTML("Population Changes in Canada<br/>2016 to 2021")),
-                  tags$div(style="margin:auto;width='100%';text-align: center;",tags$small("Daniel Grant (see github for more info)")),
+                  tags$div(style="margin:auto;width='100%';text-align: center;",HTML("<small>Daniel Grant (see <a href='https://github.com/dgrant59/CanadaCensusI/'style='color:powderblue;'>github</a> for more info)</small>")),
                   tags$h4(style="text-align: center;","Select Provinces/Territories"),
                   tags$h5(style="text-align: center;","(More selected will take more time)"),
                   br(),
@@ -202,7 +202,7 @@ server <- function(input,output,session){
                                                                 colors=c(brewer.pal(6,"RdYlGn"),"#808080"), 
                                                                 opacity=0.6,
                                                                 values=~`Population percentage change, 2016 to 2021`,
-                                                                labels = c("Less than 0","0 to 2.6","2.6 to 5.2","5.2 to 7.8","7.8 to 10.4","More than 10.4","No population in 2016"))
+                                                                labels = c("Less than 0","0 to 2.6","2.6 to 5.2","5.2 to 7.8","7.8 to 10.4","More than 10.4","No/Missing population in 2016"))
   })
 
   output$top <- renderTable({if(is.null(input$submit)||input$submit==0){
