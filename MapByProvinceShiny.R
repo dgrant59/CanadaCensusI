@@ -26,6 +26,7 @@ popdata$GEO_NAME <- enc2utf8(popdata$GEO_NAME)
 canada <- read_sf(dsn = "./Shapefiles/TestReduced.shp", 
                   stringsAsFactors = T)
 canada <- st_transform(canada, 4326)
+
 #Join map data to case data for easy plotting
 canada <- left_join(canada,popdata, by=c("DGUID"="DGUID"),keep=F) 
 
