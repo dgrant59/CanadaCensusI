@@ -11,6 +11,8 @@ at the census subdivision level (5,161 regions) to see which areas outpaced/were
 
 Note: Quality flags indicate the quality of the data shown in the 2016, 2021, and %-change statistics, respectively. Quality flags other than 0,0,0 indicate that data may not be reliable.
 
+Additionally, tables showing top 5 and bottom 5 growing regions for a given selection are restricted to census subdivisions with over 1,000 population in 2016. This was to avoid misleading statistics where very sparsely populated subdivisions would show extreme growth that is not very interesting in reality (1 person in 2016 to 2 people in 2021 is 100% growth!).
+
 ## Sources
 [Map .shp files for 2021 Census Subdivisions (StatCan)](https://www12.statcan.gc.ca/census-recensement/2021/geo/sip-pis/boundary-limites/index2021-eng.cfm?year=21)
 
